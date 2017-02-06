@@ -83,7 +83,7 @@ class CTAPIConnection(Thread):
         # Call tag list subcribers
         for list_name, callback in self.subscribers:
             if list_name == tag_list:
-                callback((event_date, new_events, self.host()))
+                callback((event_date, list_name, self.host(), new_events,))
 
     def host(self):
         return self.CITECT_CONNECTION_PARAMS[0]
