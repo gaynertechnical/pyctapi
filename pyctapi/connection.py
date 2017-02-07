@@ -75,6 +75,7 @@ class CTAPIConnection(Thread):
             event = self._ctapi.next_event(tag_list, pyctapi.CT_LIST_EVENT_NEW + pyctapi.CT_LIST_EVENT_STATUS)
             if event == None:
                 break
+
             new_events.append(event)
 
         # If no new events, do proceed to callbacks
@@ -91,8 +92,19 @@ class CTAPIConnection(Thread):
 
     def _read_lists(self):
         print("Running event check loop")
+
+        # Check if the polling lock is available
+        if self._poll_lock != None:
+            lock = self._poll_lock.acquire(blocking=False)
+            print("Lock acquired")
+
         # Reading entire tag list
         while self._ok_to_run:
+
+            # Try and get the lock
+            # Check if the polling lock is available
+            if self._poll_lock != None and not lock:
+                lock = self._poll_lock.acquire(blocking=False)
 
             try:
                 # Update internal tags lists
@@ -101,27 +113,23 @@ class CTAPIConnection(Thread):
                 for tag_list in self.tag_lists:
                     # Refresh list
                     self._ctapi.refresh_list(tag_list)
-
-                    # Check if the polling lock is available
-                    if self._poll_lock != None and self._poll_lock.acquire(blocking=False):
-                        print("Lock acquired")
+                
+                    if self._poll_lock != None and lock: 
                         self._process_events(tag_list)
 
             except CTAPITagDoesNotExist as e:
                     print("Error", e)
 
             except CTAPIGeneralError as e:
-                if self._poll_lock != None:
-                    self._poll_lock.release()
-                    print("Lock released")
-            
                 if e.error_code == 233:
                     print("Connection lost to %" % self.host())
-                    break
+                break
 
             sleep(self._scan_rate)
-        self._poll_lock.release()
-        print("Lock released") 
+
+        if self._poll_lock != None and lock:
+            self._poll_lock.release()
+            print("Lock released") 
 
     def _init_tag_lists(self):
         for list_name in self.tag_lists:
