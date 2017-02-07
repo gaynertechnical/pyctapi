@@ -10,14 +10,14 @@ from pyctapi.adapter import CTAPIFailedToConnect, CTAPIGeneralError, CTAPITagDoe
 
 class CTAPIClusterConnection(Thread):
     '''Allows multiple connection objects to share a lock for processin callbacks'''
-    def __init__(self, cluster_params):
+    def __init__(self, cluster_params, dll_path):
         self._poll_lock = Lock()
         self.cluster_params = cluster_params
 
         self.connections = set()
 
         for server_params in self.cluster_params:
-            connection = CTAPIConnection(server_params, poll_lock=self._poll_lock)
+            connection = CTAPIConnection(server_params, dll_path, poll_lock=self._poll_lock)
             self.connections.add(connection)
 
     def add_list(self, list_name):
@@ -37,8 +37,9 @@ class CTAPIClusterConnection(Thread):
             con.die()
 
 class CTAPIConnection(Thread):
-    def __init__(self, connection_params, scan_rate=0.1, poll_lock=None):
+    def __init__(self, connection_params, dll_path, scan_rate=0.1, poll_lock=None):
         Thread.__init__(self)
+        self._dll_path = dll_path
         self._ctapi = None
         self._ok_to_run = True
         self._scan_rate = scan_rate
@@ -151,7 +152,7 @@ class CTAPIConnection(Thread):
         host, username, password = self.CITECT_CONNECTION_PARAMS
         while self._ok_to_run:
             try:
-                with adapter.CTAPIAdapter(host, username, password) as self._ctapi:
+                with adapter.CTAPIAdapter(host, username, password, self._dll_path) as self._ctapi:
                     # If we get a connection reset the backoff timer
                     self._backoff_time = 0.5
 
