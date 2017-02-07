@@ -118,7 +118,7 @@ class CTAPIAdapter:
 
     def refresh_list(self, list_name):
         status_code = self._ctapi.ctListRead(self._tag_lists[list_name])
-        if status_code != pyctapi.CT_SUCCESS:
+        if status_code == 0:
             raise CTAPIGeneralError(self._ctapi.getErrorCode())
 
     def value_from_list(self, tag_name):
