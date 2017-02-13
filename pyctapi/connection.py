@@ -118,12 +118,17 @@ class CTAPIConnection(Thread):
                         self._process_events(tag_list)
 
             except CTAPITagDoesNotExist as e:
-                    print("Error", e)
+                print("Error", e)
 
             except CTAPIGeneralError as e:
                 if e.error_code == 233:
                     print("Connection lost to %" % self.host())
-                break
+                    break
+                elif e.error_code == 12:
+                    print("tag problem")
+                else:
+                    print(e.error_code)
+                
 
             sleep(self._scan_rate)
 
