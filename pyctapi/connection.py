@@ -165,7 +165,7 @@ class CTAPIConnection(Thread):
         host, username, password = self.CITECT_CONNECTION_PARAMS
         while self._ok_to_run:
             try:
-                with adapter.CTAPIAdapter(host, username, password, self._dll_path) as self._ctapi:
+                with adapter.CTAPIAdapter(host, username, password, dll_path=self._dll_path) as self._ctapi:
                     # If we get a connection reset the backoff timer
                     self._backoff_time = 0.5
 
