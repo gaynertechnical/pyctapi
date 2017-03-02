@@ -75,7 +75,9 @@ class CTAPIAdapter:
 
         elif buff_as_string.count(".") == 1:
             point_index = buff_as_string.find(".")
-            if buff_as_string[:point_index].isdigit() and buff_as_string[point_index+1:].isdigit():
+            int_part = buff_as_string[:point_index]
+            fractional_part = buff_as_string[point_index+1:]
+            if int_part.isdigit() and (fractional_part.isdigit() or fractional_part == ""):
                 return float(buff_as_string)
 
         return buff_as_string
