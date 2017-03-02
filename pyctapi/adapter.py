@@ -22,6 +22,10 @@ class CTAPITagDoesNotExist(Exception):
     def __init__(self, error):
         Exception.__init__(self, error)
 
+class CTAPINoValidDataYet(Exception):
+    def __init__(self, error):
+        Exception.__init__(self, error)
+
 class CTAPIGeneralError(Exception):
     def __init__(self, error):
         Exception.__init__(self, error)
@@ -128,13 +132,16 @@ class CTAPIAdapter:
         except KeyError as e:
             raise CTAPIGeneralError("Tag %s has not been added to tag list" % tag_name)
 
-        if status_code == pyctapi.CT_SUCCESS:
+        if status_code == 1:
             return self._parse_buffer_to_value(value_buffer)
 
         error = self._ctapi.getErrorCode()
         if pyctapi.IsCitectError(error):
             if pyctapi.WIN32_TO_CT_ERROR(error) == 424:
                 raise CTAPITagDoesNotExist("%s does not exist" % tag_name)
+            elif pyctapi.WIN32_TO_CT_ERROR(error) == 25:
+                raise CTAPINoValidDataYet("%s doesnt have valid data yet" % tag_name)
+
 
         raise CTAPIGeneralError(error)
 
