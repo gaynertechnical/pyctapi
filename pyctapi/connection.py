@@ -45,6 +45,7 @@ class CTAPIConnection(Thread):
         self._scan_rate = scan_rate
         self._poll_lock = poll_lock
 
+        self.lock_status = False
         self._backoff_time = 0.5
 
         self.CITECT_CONNECTION_PARAMS = connection_params
@@ -90,21 +91,23 @@ class CTAPIConnection(Thread):
     def host(self):
         return self.CITECT_CONNECTION_PARAMS[0]
 
-    def _read_lists(self):
-        print("Running event check loop")
-
-        # Check if the polling lock is available
+    def get_poll_lock(self):
         if self._poll_lock != None:
-            lock = self._poll_lock.acquire(blocking=False)
-            print("Lock acquired")
+            if self._poll_lock.acquire(blocking=True, timeout=1):
+                print(self.host(), "Poll lock acquired")
+                self.lock_status = True
+                return True
+            else:
+                self.lock_status = False
+                return False
+        self.lock_status = True
+        return True
+
+    def _read_lists(self):
+        print(self.host(), "Running event check loop")
 
         # Reading entire tag list
         while self._ok_to_run:
-
-            # Try and get the lock
-            # Check if the polling lock is available
-            if self._poll_lock != None and not lock:
-                lock = self._poll_lock.acquire(blocking=False)
 
             try:
                 # Update internal tags lists
@@ -114,45 +117,53 @@ class CTAPIConnection(Thread):
                     # Refresh list
                     self._ctapi.refresh_list(tag_list)
                 
-                    if self._poll_lock != None and lock: 
+                    if self.lock_status or self.get_poll_lock(): 
                         self._process_events(tag_list)
 
             except CTAPITagDoesNotExist as e:
-                print("Error", e)
+                print(self.host(), "Tag does not exist", e)
 
             except CTAPIGeneralError as e:
                 if e.error_code == 233:
-                    print("Connection lost to %" % self.host())
+                    print(self.host(), "Connection lost to %" % self.host())
                     break
+                elif e.error_code == 1:
+                    print(self.host(), "error", e.error_code)
                 elif e.error_code == 12:
-                    print("tag problem")
+                    print(self.host(), "tag problem")
+                elif e.error_code == 21:
+                    print(self.host(), "error 21")
                 else:
-                    print(e.error_code)
+                    print(self.host(), "error", e.error_code)
+                    print(self.host(), "error", pyctapi.CT_TO_WIN32_ERROR(e.error_code))
+                    print(self.host(), "error", pyctapi.WIN32_TO_CT_ERROR(e.error_code))
+                    break
                 
 
             sleep(self._scan_rate)
 
-        if self._poll_lock != None and lock:
+        if self._poll_lock != None and self.lock_status == True:
             self._poll_lock.release()
-            print("Lock released") 
+            self.lock_status = False
+            print(self.host(), "Lock released") 
 
     def _init_tag_lists(self):
         for list_name in self.tag_lists:
-            print("Created tag list %s" % list_name)
+            print(self.host(), "Created tag list %s" % list_name)
             self._ctapi.create_tag_list(list_name, pyctapi.CT_LIST_EVENT + pyctapi.CT_LIST_LIGHTWEIGHT_MODE)
 
         for list_name, tag_name in self.tags:
-            print("Created tag %s -> %s" % (list_name, tag_name))
+            #print(self.host(), "Created tag %s -> %s" % (list_name, tag_name))
             self._ctapi.add_tag_to_list(list_name, tag_name)
 
     def _update_tag_lists(self):
         for list_name in self.tag_lists_changed - self.tag_lists:
-            print("Added tag list %s" % list_name)
+            print(self.host(), "Added tag list %s" % list_name)
             self._ctapi.create_tag_list(list_name, pyctapi.CT_LIST_EVENT + pyctapi.CT_LIST_LIGHTWEIGHT_MODE)
         self.tag_lists |= self.tag_lists_changed
 
         for list_name, tag_name in self.tags_changed - self.tags:
-            print("Added tag %s -> %s" % (list_name, tag_name))
+            #print(self.host(), "Added tag %s -> %s" % (list_name, tag_name))
             self._ctapi.add_tag_to_list(list_name, tag_name)
         self.tags |= self.tags_changed
 
@@ -165,7 +176,7 @@ class CTAPIConnection(Thread):
         host, username, password = self.CITECT_CONNECTION_PARAMS
         while self._ok_to_run:
             try:
-                with adapter.CTAPIAdapter(host, username, password, dll_path=self._dll_path) as self._ctapi:
+                with adapter.CTAPIAdapter(host, username, password, pyctapi.CT_OPEN_NO_OPTION, self._dll_path) as self._ctapi:
                     # If we get a connection reset the backoff timer
                     self._backoff_time = 0.5
 
@@ -174,7 +185,7 @@ class CTAPIConnection(Thread):
                     self._read_lists()
 
             except CTAPIFailedToConnect:
-                print("Connection failed retrying")
+                print(self.host(), "Connection failed retrying")
                 self._increase_backoff_time()
                 sleep(self._backoff_time)
                 continue
@@ -182,7 +193,7 @@ class CTAPIConnection(Thread):
             sleep(self._backoff_time)
 
     def die(self):
-        print("Stopping connection")
+        print(self.host(), "Stopping connection")
         self._ok_to_run = False
         self.join()
 
