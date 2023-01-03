@@ -119,6 +119,10 @@ class CTAPIWrapper:
 
     def ctListAdd(self, _list, tag_name):
         return windll.CtApi.ctListAdd(_list, tag_name.encode("ascii"))
+    
+    def ctListAddEx(self, _list, tag_name, raw_mode=False, poll_period_ms=300,deadband_percent=-1.0 ):
+        db = ctypes.c_double(deadband_percent)
+        return windll.CtApi.ctListAddEx(_list, tag_name.encode("ascii"), raw_mode, poll_period_ms,db )
 
     def ctListDelete(self, tag_handle):
         windll.CtApi.ctListDelete(tag_handle)

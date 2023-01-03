@@ -62,8 +62,8 @@ class CTAPIConnection(Thread):
     def add_list(self, list_name):
         self.tag_lists_changed.add(list_name) 
 
-    def add_tag(self, list_name, tag_name):
-        self.tags_changed.add((list_name, tag_name,)) 
+    def add_tag(self, list_name, tag_name, raw_mode=False, poll_period_ms=300,deadband_percent=-1.0):
+        self.tags_changed.add((list_name, tag_name,raw_mode, poll_period_ms,deadband_percent)) 
 
     def subscribe(self, list_name, callback):
         self.subscribers.add((list_name, callback))
@@ -144,6 +144,7 @@ class CTAPIConnection(Thread):
             if skip_scan_delay == False:
                 sleep(self._scan_rate)
                 
+
         if self._poll_lock != None and self.lock_status == True:
             self._poll_lock.release()
             self.lock_status = False
@@ -154,9 +155,9 @@ class CTAPIConnection(Thread):
             print(self.host(), "Created tag list %s" % list_name)
             self._ctapi.create_tag_list(list_name, pyctapi.CT_LIST_EVENT + pyctapi.CT_LIST_LIGHTWEIGHT_MODE)
 
-        for list_name, tag_name in self.tags:
+        for list_name, tag_name, raw_mode, poll_period_ms, deadband_percent in self.tags:
             #print(self.host(), "Created tag %s -> %s" % (list_name, tag_name))
-            self._ctapi.add_tag_to_list(list_name, tag_name)
+            self._ctapi.add_tag_to_list(list_name, tag_name, raw_mode, poll_period_ms, deadband_percent)
 
     def _update_tag_lists(self):
         for list_name in self.tag_lists_changed - self.tag_lists:
@@ -164,9 +165,9 @@ class CTAPIConnection(Thread):
             self._ctapi.create_tag_list(list_name, pyctapi.CT_LIST_EVENT + pyctapi.CT_LIST_LIGHTWEIGHT_MODE)
         self.tag_lists |= self.tag_lists_changed
 
-        for list_name, tag_name in self.tags_changed - self.tags:
+        for list_name, tag_name, raw_mode, poll_period_ms, deadband_percent in self.tags_changed - self.tags:
             #print(self.host(), "Added tag %s -> %s" % (list_name, tag_name))
-            self._ctapi.add_tag_to_list(list_name, tag_name)
+            self._ctapi.add_tag_to_list(list_name, tag_name, raw_mode, poll_period_ms, deadband_percent)
         self.tags |= self.tags_changed
 
     def _increase_backoff_time(self):

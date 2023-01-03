@@ -108,8 +108,8 @@ class CTAPIAdapter:
 
         raise CTAPIGeneralError(self._ctapi.getErrorCode())
 
-    def add_tag_to_list(self, list_name, tag_name):
-        tag_handle = self._ctapi.ctListAdd(self._tag_lists[list_name], tag_name)
+    def add_tag_to_list(self, list_name, tag_name, raw_mode=False, poll_period_ms=300,deadband_percent=-1.0):
+        tag_handle = self._ctapi.ctListAddEx(self._tag_lists[list_name], tag_name, raw_mode, poll_period_ms, deadband_percent)
         if tag_handle != None:
             self._tag_handles[tag_name] = tag_handle
             return tag_handle
