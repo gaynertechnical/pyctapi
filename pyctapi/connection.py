@@ -108,8 +108,8 @@ class CTAPIConnection(Thread):
 
         # Reading entire tag list
         while self._ok_to_run:
-
-            try:
+            skip_scan_delay = False
+            try:  
                 # Update internal tags lists
                 self._update_tag_lists()
 
@@ -122,6 +122,7 @@ class CTAPIConnection(Thread):
 
             except CTAPITagDoesNotExist as e:
                 print(self.host(), "Tag does not exist", e)
+                skip_scan_delay = True
 
             except CTAPIGeneralError as e:
                 if e.error_code == 233:
@@ -138,10 +139,11 @@ class CTAPIConnection(Thread):
                     print(self.host(), "error", pyctapi.CT_TO_WIN32_ERROR(e.error_code))
                     print(self.host(), "error", pyctapi.WIN32_TO_CT_ERROR(e.error_code))
                     break
+                skip_scan_delay = True
                 
-
-            sleep(self._scan_rate)
-
+            if skip_scan_delay == False:
+                sleep(self._scan_rate)
+                
         if self._poll_lock != None and self.lock_status == True:
             self._poll_lock.release()
             self.lock_status = False
