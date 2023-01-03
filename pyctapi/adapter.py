@@ -7,6 +7,7 @@
 #
 
 from ctypes import create_string_buffer
+from ctypes.wintypes import HANDLE
 
 from pyctapi import pyctapi
 
@@ -41,6 +42,8 @@ class CTAPIAdapter:
         self._ctapi = pyctapi.CTAPIWrapper(dll_path)
         self._tag_lists = {} 
         self._tag_handles = {}
+        self._search_handle = None
+        self._search_obj_handle = HANDLE()
 
     def __enter__(self):
         self.connect()
@@ -158,4 +161,43 @@ class CTAPIAdapter:
         if status_code != pyctapi.CT_SUCCESS:
             raise CTAPIGeneralError(self._ctapi.getErrorCode())
         return status_code
+
+    #Attaching this callable to restype of DLL function 
+    def _return_error_check(self, value):
+        if value : # Null or None has zeo boolean value
+            if value == 0: # CTAPI functions return '0' on error
+               raise CTAPIGeneralError(self._ctapi.getErrorCode())
+            return value
+        raise CTAPIGeneralError(self._ctapi.getErrorCode())# CTAPI functions return NULL on error
+
+    def search(self, search_str):
+        ''' Form search functionality as implemented by ctFindFirst family'''
+        try:
+            self._search_handle = self._return_error_check(self._ctapi.ctFindFirst(self._connection, search_str, self._search_obj_handle ))
+            # Get Metadata of result
+            value_buffer = create_string_buffer(b'0' * 50)
+            self._ctapi.ctGetProperty(self._search_obj_handle, 'object.fields.count',value_buffer)
+            fields_count = int(value_buffer.value)
+            fields=[]
+            for i in range(1,fields_count+1,1):
+                self._ctapi.ctGetProperty(self._search_obj_handle, 'object.fields({}).name'.format(i),value_buffer)
+                fields.append(value_buffer.value.decode("utf-8"))
+            
+            data=[]
+            while True:
+                data_item = dict()
+                for field in fields:
+                    self._ctapi.ctGetProperty(self._search_obj_handle, field, value_buffer)
+                    data_item[str(field)] = value_buffer.value.decode("utf-8")
+                data.append(data_item)
+                if self._ctapi.ctFindNext(self._search_handle, self._search_obj_handle) == 0:
+                    break
+            return data
+
+        except:
+            error = self._ctapi.getErrorCode()
+            print("Error in search {}".format(error))
+        finally:
+            self._ctapi.ctFindClose(self._search_handle)
+            self._search_handle = None
 
